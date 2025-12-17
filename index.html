@@ -53,6 +53,17 @@ button,select{
   background:#00ffcc;
   border-radius:7px;
 }
+#result{
+  position:absolute; top:50%; left:50%;
+  transform:translate(-50%,-50%);
+  background:rgba(0,0,0,.75);
+  padding:20px 28px;
+  border-radius:16px;
+  font-size:20px;
+  text-align:center;
+  white-space:pre-line;
+  display:none;
+}
 </style>
 </head>
 <body>
@@ -64,8 +75,8 @@ button,select{
 
 <div id="info">準備中…</div>
 <div id="countdown"></div>
-
 <div id="progressWrap"><div id="progress"></div></div>
+<div id="result"></div>
 
 <div id="panel">
   <select id="duration">
@@ -84,30 +95,33 @@ button,select{
 import {FilesetResolver, PoseLandmarker}
 from "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.0";
 
-const video  = document.getElementById("video");
-const canvas = document.getElementById("canvas");
-const ctx    = canvas.getContext("2d");
-const info   = document.getElementById("info");
+const video=document.getElementById("video");
+const canvas=document.getElementById("canvas");
+const ctx=canvas.getContext("2d");
 
-const startBtn = document.getElementById("startBtn");
-const stopBtn  = document.getElementById("stopBtn");
-const durationSel = document.getElementById("duration");
-const countdownEl = document.getElementById("countdown");
-const progressEl  = document.getElementById("progress");
+const info=document.getElementById("info");
+const resultEl=document.getElementById("result");
+const countdownEl=document.getElementById("countdown");
+const progressEl=document.getElementById("progress");
+
+const startBtn=document.getElementById("startBtn");
+const stopBtn=document.getElementById("stopBtn");
+const durationSel=document.getElementById("duration");
 
 let recording=false;
 let startTime=0;
 let totalTime=0;
 let timerID=null;
 let comLog=[];
+let showTrajectory=false;
 
 const avg=(a,b)=>({x:(a.x+b.x)/2,y:(a.y+b.y)/2});
 
 async function setupCamera(){
-  const stream=await navigator.mediaDevices.getUserMedia({
+  const s=await navigator.mediaDevices.getUserMedia({
     video:{facingMode:"user"},audio:false
   });
-  video.srcObject=stream;
+  video.srcObject=s;
   return new Promise(r=>video.onloadedmetadata=r);
 }
 
@@ -141,13 +155,17 @@ function stopRecording(){
   recording=false;
   clearTimeout(timerID);
   progressEl.style.width="0%";
+  showTrajectory=true;
 
   const {sd,len}=computeMetrics(comLog);
-  info.textContent=
-    `計測終了\n\nCOM SD：${sd.toFixed(1)} px\n軌跡長：${len.toFixed(1)} px`;
+  resultEl.textContent=
+    `計測結果\n\nCOM SD：${sd.toFixed(1)} px\n軌跡長：${len.toFixed(1)} px`;
+  resultEl.style.display="block";
 }
 
-async function startWithCountdown(){
+function startWithCountdown(){
+  resultEl.style.display="none";
+  showTrajectory=false;
   let c=5;
   countdownEl.style.display="block";
   countdownEl.textContent=c;
@@ -169,7 +187,6 @@ function startRecording(){
   recording=true;
   startTime=performance.now();
   totalTime=Number(durationSel.value)*1000;
-
   timerID=setTimeout(stopRecording,totalTime);
 }
 
@@ -195,6 +212,15 @@ function loop(){
   ctx.drawImage(video,-canvas.width,0,canvas.width,canvas.height);
   ctx.restore();
 
+  if(showTrajectory && comLog.length>1){
+    ctx.strokeStyle="#00ffff";
+    ctx.lineWidth=3;
+    ctx.beginPath();
+    ctx.moveTo(comLog[0].x,comLog[0].y);
+    for(const p of comLog) ctx.lineTo(p.x,p.y);
+    ctx.stroke();
+  }
+
   if(res.landmarks?.length){
     const lm=res.landmarks[0];
     let s=avg(lm[11],lm[12]);
@@ -216,14 +242,12 @@ function loop(){
       comLog.push({x:cx,y:cy});
       const elapsed=performance.now()-startTime;
       const sec=Math.min(elapsed/1000,totalTime/1000);
-
-      info.textContent=
-        `計測中\n${sec.toFixed(1)} / ${totalTime/1000} 秒`;
-
+      info.textContent=`計測中\n${sec.toFixed(1)} / ${totalTime/1000} 秒`;
       progressEl.style.width=
         `${Math.min(elapsed/totalTime*100,100)}%`;
     }
   }
+
   requestAnimationFrame(loop);
 }
 loop();
