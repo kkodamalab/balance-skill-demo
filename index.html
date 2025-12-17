@@ -33,6 +33,26 @@ button,select{
   padding:10px 14px; border-radius:10px;
   text-align:center; white-space:pre-line;
 }
+#countdown{
+  position:absolute; top:50%; left:50%;
+  transform:translate(-50%,-50%);
+  font-size:72px; font-weight:bold;
+  background:rgba(0,0,0,.6);
+  padding:20px 30px;
+  border-radius:20px;
+  display:none;
+}
+#progressWrap{
+  position:absolute; top:70px; left:50%;
+  transform:translateX(-50%);
+  width:80%; height:14px;
+  background:#333; border-radius:7px;
+}
+#progress{
+  height:100%; width:0%;
+  background:#00ffcc;
+  border-radius:7px;
+}
 </style>
 </head>
 <body>
@@ -43,6 +63,9 @@ button,select{
 </div>
 
 <div id="info">準備中…</div>
+<div id="countdown"></div>
+
+<div id="progressWrap"><div id="progress"></div></div>
 
 <div id="panel">
   <select id="duration">
@@ -69,51 +92,47 @@ const info   = document.getElementById("info");
 const startBtn = document.getElementById("startBtn");
 const stopBtn  = document.getElementById("stopBtn");
 const durationSel = document.getElementById("duration");
+const countdownEl = document.getElementById("countdown");
+const progressEl  = document.getElementById("progress");
 
-let recording = false;
-let timerID = null;
-let comLog = [];
+let recording=false;
+let startTime=0;
+let totalTime=0;
+let timerID=null;
+let comLog=[];
 
-const avg = (a,b)=>({x:(a.x+b.x)/2,y:(a.y+b.y)/2});
+const avg=(a,b)=>({x:(a.x+b.x)/2,y:(a.y+b.y)/2});
 
 async function setupCamera(){
-  const stream = await navigator.mediaDevices.getUserMedia({
-    video:{facingMode:"user"}, audio:false
+  const stream=await navigator.mediaDevices.getUserMedia({
+    video:{facingMode:"user"},audio:false
   });
-  video.srcObject = stream;
+  video.srcObject=stream;
   return new Promise(r=>video.onloadedmetadata=r);
 }
 
-const vision = await FilesetResolver.forVisionTasks(
+const vision=await FilesetResolver.forVisionTasks(
   "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.0/wasm"
 );
-
-const pose = await PoseLandmarker.createFromOptions(vision,{
+const pose=await PoseLandmarker.createFromOptions(vision,{
   baseOptions:{
     modelAssetPath:
     "https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_full/float16/1/pose_landmarker_full.task"
   },
-  runningMode:"VIDEO", numPoses:1
+  runningMode:"VIDEO",numPoses:1
 });
-
 await setupCamera();
 
-function computeMetrics(points){
-  if(points.length<2) return {sd:0, len:0};
-
-  const mx = points.reduce((s,p)=>s+p.x,0)/points.length;
-  const my = points.reduce((s,p)=>s+p.y,0)/points.length;
-
-  const sd = Math.sqrt(
-    points.reduce((s,p)=>s+((p.x-mx)**2+(p.y-my)**2),0)/points.length
+function computeMetrics(p){
+  if(p.length<2) return {sd:0,len:0};
+  const mx=p.reduce((s,v)=>s+v.x,0)/p.length;
+  const my=p.reduce((s,v)=>s+v.y,0)/p.length;
+  const sd=Math.sqrt(
+    p.reduce((s,v)=>s+((v.x-mx)**2+(v.y-my)**2),0)/p.length
   );
-
-  let len = 0;
-  for(let i=1;i<points.length;i++){
-    len += Math.hypot(
-      points[i].x-points[i-1].x,
-      points[i].y-points[i-1].y
-    );
+  let len=0;
+  for(let i=1;i<p.length;i++){
+    len+=Math.hypot(p[i].x-p[i-1].x,p[i].y-p[i-1].y);
   }
   return {sd,len};
 }
@@ -121,20 +140,40 @@ function computeMetrics(points){
 function stopRecording(){
   recording=false;
   clearTimeout(timerID);
+  progressEl.style.width="0%";
 
-  const {sd,len} = computeMetrics(comLog);
-  info.textContent =
+  const {sd,len}=computeMetrics(comLog);
+  info.textContent=
     `計測終了\n\nCOM SD：${sd.toFixed(1)} px\n軌跡長：${len.toFixed(1)} px`;
 }
 
-startBtn.onclick=()=>{
+async function startWithCountdown(){
+  let c=5;
+  countdownEl.style.display="block";
+  countdownEl.textContent=c;
+
+  const iv=setInterval(()=>{
+    c--;
+    if(c>0){
+      countdownEl.textContent=c;
+    }else{
+      clearInterval(iv);
+      countdownEl.style.display="none";
+      startRecording();
+    }
+  },1000);
+}
+
+function startRecording(){
   comLog=[];
   recording=true;
-  const sec = Number(durationSel.value);
-  info.textContent=`計測中… ${sec}秒`;
-  timerID=setTimeout(stopRecording,sec*1000);
-};
+  startTime=performance.now();
+  totalTime=Number(durationSel.value)*1000;
 
+  timerID=setTimeout(stopRecording,totalTime);
+}
+
+startBtn.onclick=startWithCountdown;
 stopBtn.onclick=stopRecording;
 
 let lastTime=-1;
@@ -173,9 +212,18 @@ function loop(){
     ctx.arc(cx,cy,6,0,Math.PI*2);
     ctx.fill();
 
-    if(recording) comLog.push({x:cx,y:cy});
-  }
+    if(recording){
+      comLog.push({x:cx,y:cy});
+      const elapsed=performance.now()-startTime;
+      const sec=Math.min(elapsed/1000,totalTime/1000);
 
+      info.textContent=
+        `計測中\n${sec.toFixed(1)} / ${totalTime/1000} 秒`;
+
+      progressEl.style.width=
+        `${Math.min(elapsed/totalTime*100,100)}%`;
+    }
+  }
   requestAnimationFrame(loop);
 }
 loop();
