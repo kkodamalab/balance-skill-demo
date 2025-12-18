@@ -27,7 +27,7 @@ button,select{
   font-size:16px; padding:6px 10px;
 }
 #info{
-  position:absolute; top:10px; left:50%;
+  position:absolute; top:20px; left:50%;
   transform:translateX(-50%);
   background:rgba(0,0,0,.6);
   padding:10px 14px;
@@ -45,7 +45,7 @@ button,select{
   display:none;
 }
 #progressWrap{
-  position:absolute; top:100px; left:50%;
+  position:absolute; top:80px; left:50%;
   transform:translateX(-50%);
   width:80%; height:14px;
   background:#333; border-radius:7px;
@@ -55,11 +55,9 @@ button,select{
   background:#00ffcc;
   border-radius:7px;
 }
-
-/* ★ 結果表示：位置を変更 */
 #result{
   position:absolute;
-  top:120px;               /* ← プログレスバーの下 */
+  top:120px;
   left:50%;
   transform:translateX(-50%);
   background:rgba(0,0,0,.65);
@@ -160,7 +158,6 @@ function stopRecording(){
   const sdML=computeSD(xs);
   const sdAP=computeSD(ys);
 
-  /* ★ 表示文言を1行ずつ */
   resultEl.textContent=
     `計測結果\n`+
     `左右：${sdML.toFixed(1)} px\n`+
@@ -211,20 +208,25 @@ function loop(){
 
   const res=pose.detectForVideo(video,performance.now());
 
+  // 鏡像
   ctx.save();
   ctx.scale(-1,1);
   ctx.drawImage(video,-canvas.width,0,canvas.width,canvas.height);
   ctx.restore();
 
   if(showTrajectory){
+    /* ★ 2次元プロット位置を上へ */
     const fx=canvas.width/2;
-    const fy=canvas.height*0.65;
-    const size=300;
+    const fy=canvas.height*0.52;
 
-    ctx.strokeStyle="rgba(255,255,255,0.4)";
-    ctx.lineWidth=3;
+    /* ★ 正方形を縮小 */
+    const size=200;
+
+    ctx.strokeStyle="rgba(255,255,255,0.35)";
+    ctx.lineWidth=2;
     ctx.strokeRect(fx-size/2, fy-size/2, size, size);
 
+    // 中心十字（原点）
     ctx.beginPath();
     ctx.moveTo(fx-size/2, fy);
     ctx.lineTo(fx+size/2, fy);
@@ -232,16 +234,17 @@ function loop(){
     ctx.lineTo(fx, fy+size/2);
     ctx.stroke();
 
+    /* ★ 足跡を原点に配置 */
     ctx.fillStyle="rgba(255,255,255,0.6)";
     ctx.beginPath();
-    ctx.ellipse(fx-40, fy+80, 18, 36, 0, 0, Math.PI*2);
-    ctx.ellipse(fx+40, fy+80, 18, 36, 0, 0, Math.PI*2);
+    ctx.ellipse(fx-22, fy+35, 12, 24, 0, 0, Math.PI*2);
+    ctx.ellipse(fx+22, fy+35, 12, 24, 0, 0, Math.PI*2);
     ctx.fill();
 
     if(comLog.length>1){
       const x0=comLog[0].x;
       const y0=comLog[0].y;
-      const scale=0.4;
+      const scale=0.35;
 
       ctx.strokeStyle="rgba(0,255,255,0.6)";
       ctx.lineWidth=3;
