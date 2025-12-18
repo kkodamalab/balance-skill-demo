@@ -55,13 +55,17 @@ button,select{
   background:#00ffcc;
   border-radius:7px;
 }
+
+/* ★ 結果表示：位置を変更 */
 #result{
-  position:absolute; top:50%; left:50%;
-  transform:translate(-50%,-50%);
-  background:rgba(0,0,0,.75);
-  padding:16px 22px;
-  border-radius:16px;
-  font-size:16px;        /* ← info と揃えた */
+  position:absolute;
+  top:120px;               /* ← プログレスバーの下 */
+  left:50%;
+  transform:translateX(-50%);
+  background:rgba(0,0,0,.65);
+  padding:12px 18px;
+  border-radius:12px;
+  font-size:16px;
   text-align:center;
   white-space:pre-line;
   display:none;
@@ -156,8 +160,9 @@ function stopRecording(){
   const sdML=computeSD(xs);
   const sdAP=computeSD(ys);
 
+  /* ★ 表示文言を1行ずつ */
   resultEl.textContent=
-    `計測結果\n\n`+
+    `計測結果\n`+
     `COM SD（左右）：${sdML.toFixed(1)} px\n`+
     `COM SD（前後）：${sdAP.toFixed(1)} px`;
 
@@ -206,17 +211,15 @@ function loop(){
 
   const res=pose.detectForVideo(video,performance.now());
 
-  // 鏡像
   ctx.save();
   ctx.scale(-1,1);
   ctx.drawImage(video,-canvas.width,0,canvas.width,canvas.height);
   ctx.restore();
 
-  // ===== 計測終了後のみ足跡＋評価表示 =====
   if(showTrajectory){
     const fx=canvas.width/2;
-    const fy=canvas.height/2;
-    const size=280;
+    const fy=canvas.height*0.65;
+    const size=300;
 
     ctx.strokeStyle="rgba(255,255,255,0.4)";
     ctx.lineWidth=3;
@@ -229,11 +232,10 @@ function loop(){
     ctx.lineTo(fx, fy+size/2);
     ctx.stroke();
 
-    // 足跡
     ctx.fillStyle="rgba(255,255,255,0.6)";
     ctx.beginPath();
-    ctx.ellipse(fx-40, fy+70, 18, 36, 0, 0, Math.PI*2);
-    ctx.ellipse(fx+40, fy+70, 18, 36, 0, 0, Math.PI*2);
+    ctx.ellipse(fx-40, fy+80, 18, 36, 0, 0, Math.PI*2);
+    ctx.ellipse(fx+40, fy+80, 18, 36, 0, 0, Math.PI*2);
     ctx.fill();
 
     if(comLog.length>1){
