@@ -27,11 +27,13 @@ button,select{
   font-size:16px; padding:6px 10px;
 }
 #info{
-  position:absolute; top:20px; left:50%;
+  position:absolute; top:10px; left:50%;
   transform:translateX(-50%);
   background:rgba(0,0,0,.6);
-  padding:10px 14px; border-radius:10px;
+  padding:10px 14px;
+  border-radius:10px;
   text-align:center; white-space:pre-line;
+  font-size:16px;
 }
 #countdown{
   position:absolute; top:50%; left:50%;
@@ -43,7 +45,7 @@ button,select{
   display:none;
 }
 #progressWrap{
-  position:absolute; top:80px; left:50%;
+  position:absolute; top:100px; left:50%;
   transform:translateX(-50%);
   width:80%; height:14px;
   background:#333; border-radius:7px;
@@ -56,10 +58,10 @@ button,select{
 #result{
   position:absolute; top:50%; left:50%;
   transform:translate(-50%,-50%);
-  background:rgba(0,0,0,.8);
-  padding:20px 28px;
+  background:rgba(0,0,0,.75);
+  padding:16px 22px;
   border-radius:16px;
-  font-size:20px;
+  font-size:16px;        /* ← info と揃えた */
   text-align:center;
   white-space:pre-line;
   display:none;
@@ -95,172 +97,167 @@ button,select{
 import {FilesetResolver, PoseLandmarker}
 from "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.0";
 
-const video = document.getElementById("video");
-const canvas = document.getElementById("canvas");
-const ctx = canvas.getContext("2d");
+const video=document.getElementById("video");
+const canvas=document.getElementById("canvas");
+const ctx=canvas.getContext("2d");
 
-const info = document.getElementById("info");
-const resultEl = document.getElementById("result");
-const countdownEl = document.getElementById("countdown");
-const progressEl = document.getElementById("progress");
+const info=document.getElementById("info");
+const resultEl=document.getElementById("result");
+const countdownEl=document.getElementById("countdown");
+const progressEl=document.getElementById("progress");
 
-const startBtn = document.getElementById("startBtn");
-const stopBtn  = document.getElementById("stopBtn");
-const durationSel = document.getElementById("duration");
+const startBtn=document.getElementById("startBtn");
+const stopBtn=document.getElementById("stopBtn");
+const durationSel=document.getElementById("duration");
 
-let recording = false;
-let showTrajectory = false;
-let startTime = 0;
-let totalTime = 0;
-let timerID = null;
-let comLog = [];
+let recording=false;
+let showTrajectory=false;
+let startTime=0;
+let totalTime=0;
+let timerID=null;
+let comLog=[];
 
-const avg = (a,b)=>({x:(a.x+b.x)/2,y:(a.y+b.y)/2});
+const avg=(a,b)=>({x:(a.x+b.x)/2,y:(a.y+b.y)/2});
 
 async function setupCamera(){
-  const s = await navigator.mediaDevices.getUserMedia({
-    video:{facingMode:"user"}, audio:false
+  const s=await navigator.mediaDevices.getUserMedia({
+    video:{facingMode:"user"},audio:false
   });
-  video.srcObject = s;
+  video.srcObject=s;
   return new Promise(r=>video.onloadedmetadata=r);
 }
 
-const vision = await FilesetResolver.forVisionTasks(
+const vision=await FilesetResolver.forVisionTasks(
   "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.0/wasm"
 );
-const pose = await PoseLandmarker.createFromOptions(vision,{
+const pose=await PoseLandmarker.createFromOptions(vision,{
   baseOptions:{
     modelAssetPath:
       "https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_full/float16/1/pose_landmarker_full.task"
   },
-  runningMode:"VIDEO",
-  numPoses:1
+  runningMode:"VIDEO",numPoses:1
 });
 await setupCamera();
 
 function computeSD(arr){
   if(arr.length<2) return 0;
-  const m = arr.reduce((s,v)=>s+v,0)/arr.length;
+  const m=arr.reduce((s,v)=>s+v,0)/arr.length;
   return Math.sqrt(arr.reduce((s,v)=>s+(v-m)**2,0)/arr.length);
 }
 
 function stopRecording(){
-  recording = false;
+  recording=false;
   clearTimeout(timerID);
-  progressEl.style.width = "0%";
-  showTrajectory = true;
+  progressEl.style.width="0%";
+  showTrajectory=true;
 
-  const xs = comLog.map(p=>p.x);
-  const ys = comLog.map(p=>p.y);
+  const xs=comLog.map(p=>p.x);
+  const ys=comLog.map(p=>p.y);
+  const sdML=computeSD(xs);
+  const sdAP=computeSD(ys);
 
-  const sdML = computeSD(xs);
-  const sdAP = computeSD(ys);
-
-  resultEl.textContent =
-    `計測結果\n\n` +
-    `COM SD（左右）：${sdML.toFixed(1)} px\n` +
+  resultEl.textContent=
+    `計測結果\n\n`+
+    `COM SD（左右）：${sdML.toFixed(1)} px\n`+
     `COM SD（前後）：${sdAP.toFixed(1)} px`;
 
-  resultEl.style.display = "block";
+  resultEl.style.display="block";
 }
 
 function startWithCountdown(){
-  resultEl.style.display = "none";
-  showTrajectory = false;
-  let c = 5;
-  countdownEl.style.display = "block";
-  countdownEl.textContent = c;
-
-  const iv = setInterval(()=>{
+  resultEl.style.display="none";
+  showTrajectory=false;
+  let c=5;
+  countdownEl.style.display="block";
+  countdownEl.textContent=c;
+  const iv=setInterval(()=>{
     c--;
-    if(c>0){
-      countdownEl.textContent = c;
-    }else{
+    if(c>0) countdownEl.textContent=c;
+    else{
       clearInterval(iv);
-      countdownEl.style.display = "none";
+      countdownEl.style.display="none";
       startRecording();
     }
   },1000);
 }
 
 function startRecording(){
-  comLog = [];
-  recording = true;
-  startTime = performance.now();
-  totalTime = Number(durationSel.value)*1000;
-  timerID = setTimeout(stopRecording,totalTime);
+  comLog=[];
+  recording=true;
+  startTime=performance.now();
+  totalTime=Number(durationSel.value)*1000;
+  timerID=setTimeout(stopRecording,totalTime);
 }
 
-startBtn.onclick = startWithCountdown;
-stopBtn.onclick  = stopRecording;
+startBtn.onclick=startWithCountdown;
+stopBtn.onclick=stopRecording;
 
-let lastTime = -1;
+let lastTime=-1;
 function loop(){
-  if(video.readyState < 2){ requestAnimationFrame(loop); return; }
-
-  if(canvas.width !== video.videoWidth){
-    canvas.width  = video.videoWidth;
-    canvas.height = video.videoHeight;
+  if(video.readyState<2){requestAnimationFrame(loop);return;}
+  if(canvas.width!==video.videoWidth){
+    canvas.width=video.videoWidth;
+    canvas.height=video.videoHeight;
   }
-
-  if(video.currentTime === lastTime){
-    requestAnimationFrame(loop); return;
+  if(video.currentTime===lastTime){
+    requestAnimationFrame(loop);return;
   }
-  lastTime = video.currentTime;
+  lastTime=video.currentTime;
 
-  const res = pose.detectForVideo(video, performance.now());
+  const res=pose.detectForVideo(video,performance.now());
 
-  // ===== 鏡像ビデオ =====
+  // 鏡像
   ctx.save();
   ctx.scale(-1,1);
   ctx.drawImage(video,-canvas.width,0,canvas.width,canvas.height);
   ctx.restore();
 
-  // ===== 足跡評価エリア =====
-  const fx = canvas.width/2;
-  const fy = canvas.height*0.75;
-  const size = 160;
+  // ===== 計測終了後のみ足跡＋評価表示 =====
+  if(showTrajectory){
+    const fx=canvas.width/2;
+    const fy=canvas.height/2;
+    const size=280;
 
-  ctx.strokeStyle="rgba(255,255,255,0.4)";
-  ctx.lineWidth=2;
-  ctx.strokeRect(fx-size/2, fy-size/2, size, size);
-
-  ctx.beginPath();
-  ctx.moveTo(fx-size/2, fy);
-  ctx.lineTo(fx+size/2, fy);
-  ctx.moveTo(fx, fy-size/2);
-  ctx.lineTo(fx, fy+size/2);
-  ctx.stroke();
-
-  // 足跡（簡易）
-  ctx.fillStyle="rgba(255,255,255,0.6)";
-  ctx.beginPath();
-  ctx.ellipse(fx-25, fy+40, 14, 28, 0, 0, Math.PI*2);
-  ctx.ellipse(fx+25, fy+40, 14, 28, 0, 0, Math.PI*2);
-  ctx.fill();
-
-  // ===== 軌跡（足跡座標系）=====
-  if(showTrajectory && comLog.length>1){
-    const x0 = comLog[0].x;
-    const y0 = comLog[0].y;
-    const scale = 0.3;
-
-    ctx.strokeStyle="rgba(0,255,255,0.6)";
+    ctx.strokeStyle="rgba(255,255,255,0.4)";
     ctx.lineWidth=3;
+    ctx.strokeRect(fx-size/2, fy-size/2, size, size);
+
     ctx.beginPath();
-    comLog.forEach((p,i)=>{
-      const px = fx + (p.x-x0)*scale;
-      const py = fy + (p.y-y0)*scale;
-      if(i===0) ctx.moveTo(px,py);
-      else ctx.lineTo(px,py);
-    });
+    ctx.moveTo(fx-size/2, fy);
+    ctx.lineTo(fx+size/2, fy);
+    ctx.moveTo(fx, fy-size/2);
+    ctx.lineTo(fx, fy+size/2);
     ctx.stroke();
+
+    // 足跡
+    ctx.fillStyle="rgba(255,255,255,0.6)";
+    ctx.beginPath();
+    ctx.ellipse(fx-40, fy+70, 18, 36, 0, 0, Math.PI*2);
+    ctx.ellipse(fx+40, fy+70, 18, 36, 0, 0, Math.PI*2);
+    ctx.fill();
+
+    if(comLog.length>1){
+      const x0=comLog[0].x;
+      const y0=comLog[0].y;
+      const scale=0.4;
+
+      ctx.strokeStyle="rgba(0,255,255,0.6)";
+      ctx.lineWidth=3;
+      ctx.beginPath();
+      comLog.forEach((p,i)=>{
+        const px=fx+(p.x-x0)*scale;
+        const py=fy+(p.y-y0)*scale;
+        if(i===0) ctx.moveTo(px,py);
+        else ctx.lineTo(px,py);
+      });
+      ctx.stroke();
+    }
   }
 
   if(res.landmarks?.length){
-    const lm = res.landmarks[0];
-    let s = avg(lm[11],lm[12]);
-    let h = avg(lm[23],lm[24]);
+    const lm=res.landmarks[0];
+    let s=avg(lm[11],lm[12]);
+    let h=avg(lm[23],lm[24]);
 
     s.x=1-s.x; h.x=1-h.x;
     s.x*=canvas.width; s.y*=canvas.height;
@@ -271,9 +268,11 @@ function loop(){
 
     if(recording){
       comLog.push({x:cx,y:cy});
-      const elapsed = performance.now()-startTime;
-      info.textContent = `計測中\n${Math.min(elapsed/1000,totalTime/1000).toFixed(1)} 秒`;
-      progressEl.style.width = `${Math.min(elapsed/totalTime*100,100)}%`;
+      const elapsed=performance.now()-startTime;
+      info.textContent=
+        `計測中\n${Math.min(elapsed/1000,totalTime/1000).toFixed(1)} 秒`;
+      progressEl.style.width=
+        `${Math.min(elapsed/totalTime*100,100)}%`;
     }
   }
 
